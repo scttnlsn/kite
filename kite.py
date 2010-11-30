@@ -51,12 +51,14 @@ class Request(object):
         self.environ = environ
         self.method = environ['REQUEST_METHOD'].upper()
         self.path = environ['PATH_INFO']
-        self.query = cgi.parse_qs(environ['QUERY_STRING'])
+        self.params = {}
         if self.method == 'POST' or self.method == 'PUT':
-            self.form = cgi.FieldStorage(
+            self.params = cgi.FieldStorage(
                 fp = environ['wsgi.input'],
                 environ = environ,
                 keep_blank_values = 1)
+        elif self.method == 'GET' and len(environ['QUERY_STRING']):
+            self.params = cgi.parse_qs(environ['QUERY_STRING'])
 
 class Response(object):
 
