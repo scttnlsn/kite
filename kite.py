@@ -1,5 +1,6 @@
 import cgi
 import re
+import StringIO
 import traceback
 
 STATUS_CODES = {
@@ -45,20 +46,48 @@ STATUS_CODES = {
     505: 'HTTP Version not supported',
 }
 
+class memoized(object):
+    
+    def __init__(self, func):
+        self.func = func
+        self.called = False
+        self.value = None
+        
+    def __call__(self, instance):
+        if not self.called:
+            self.value = self.func(instance)
+            self.called = True
+        return self.value
+
 class Request(object):
 
     def __init__(self, environ):
         self.environ = environ
         self.method = environ['REQUEST_METHOD'].upper()
         self.path = environ['PATH_INFO']
-        self.params = {}
+    
+    @property
+    @memoized
+    def params(self):
+        return self.get_params()
+    
+    @property
+    @memoized
+    def body(self):
+        content_length = 0
+        try:
+            content_length = int(self.environ.get('CONTENT_LENGTH', '0'))
+        except ValueError:
+            pass
+        return self.environ['wsgi.input'].read(content_length)
+        
+    def get_params(self):
         if self.method == 'POST' or self.method == 'PUT':
-            self.params = cgi.FieldStorage(
-                fp = environ['wsgi.input'],
-                environ = environ,
-                keep_blank_values = 1)
-        elif self.method == 'GET' and len(environ['QUERY_STRING']):
-            self.params = cgi.parse_qs(environ['QUERY_STRING'])
+            return cgi.FieldStorage(fp = StringIO.StringIO(self.body), environ = self.environ)
+        elif self.method == 'GET' and len(self.environ['QUERY_STRING']):
+            return cgi.parse_qs(self.environ['QUERY_STRING'])
+        else:
+            return {}
 
 class Response(object):
 
