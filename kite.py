@@ -69,7 +69,7 @@ class Request(object):
     @property
     @memoized
     def params(self):
-        return self.get_params()
+        return self._get_params()
     
     @property
     @memoized
@@ -81,13 +81,31 @@ class Request(object):
             pass
         return self.environ['wsgi.input'].read(content_length)
         
-    def get_params(self):
+    def _get_params(self):
         if self.method == 'POST' or self.method == 'PUT':
-            return cgi.FieldStorage(fp = StringIO.StringIO(self.body), environ = self.environ)
+            return self._get_field_storage()
         elif self.method == 'GET' and len(self.environ['QUERY_STRING']):
-            return cgi.parse_qs(self.environ['QUERY_STRING'])
+            return self._get_query_string()
         else:
             return {}
+        
+    def _get_query_string(self):
+        params = {}
+        for key, value in cgi.parse_qs(self.environ['QUERY_STRING']).items():
+            params[key] = value[0] if len(value) <= 1 else value
+        return params
+        
+    def _get_field_storage(self):
+        params = {}
+        data = cgi.FieldStorage(fp = StringIO.StringIO(self.body), environ = self.environ)
+        for field in data:
+            if isinstance(data[field], list):
+                params[field] = [item.value for item in data[field]]
+            elif data[field].filename:
+                params[field] = data[field]
+            else:
+                params[field] = data[field].value
+        return params
 
 class Response(object):
 
@@ -154,6 +172,8 @@ class Application(object):
         return response(start_response)
 
     def match(self, request):
+        if not request.path.endswith('/'):
+            request.path += '/'
         status = 404
         for regex, handler, method in self.routes:
             match = regex.match(request.path)
