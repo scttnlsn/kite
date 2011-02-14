@@ -157,7 +157,7 @@ class Route(object):
         self.handler = handler
         self.method = method
         self.pattern = self._pattern(pattern)
-        parts = self._parse(pattern)
+        parts = self._parse(self.pattern)
         self.regex = self._regex(parts)
         self.url = self._url(parts)
         self.params = self._params(parts)
@@ -169,7 +169,7 @@ class Route(object):
 
     def _regex(self, parts):
         regex = ''
-        for part in self._parse(pattern):
+        for part in parts:
             if isinstance(part, basestring):
                 regex += part
             elif isinstance(part, dict):
@@ -178,23 +178,22 @@ class Route(object):
                 raise TypeError
         return re.compile('^%s$' % regex)
 
-    def _url(self, pattern):
+    def _url(self, parts):
         url = ''
-        for part in self._parse(pattern):
+        for part in parts:
             if isinstance(part, basestring):
                 url += part
             else:
                 url += '%s'
         return url
 
-    def _params(self, pattern):
+    def _params(self, parts):
         params = []
-        for part in self._parse(pattern):
+        for part in parts:
             if isinstance(part, dict):
                 params += [{'name': part['name'], 'regex': re.compile(part['pattern'])}]
         return params
 
-    @memoized
     def _parse(self, pattern):
         start = end = 0
         parts = []
