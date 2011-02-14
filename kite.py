@@ -163,7 +163,7 @@ class Route(object):
         self.params = self._params(parts)
 
     def _pattern(self, pattern):
-        if not pattern.endswith('/')
+        if not pattern.endswith('/'):
             pattern += '/'
         return pattern
 
