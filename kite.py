@@ -245,6 +245,14 @@ class Application(object):
             return handler
         return register
 
+    def url(self, handler, *args):
+        routes = filter(lambda route: handler == route.handler, self.routes)
+        for route in routes:
+            if len(args) == len(route.params):
+                if all([param['regex'].match(str(arg)) for arg, param in zip(args, route.params)]):
+                    return route.url % tuple(args)
+        raise AttributeError('no matching route')
+
     def get(self, url):
         return self.route(url, 'GET')
 
