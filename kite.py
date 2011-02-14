@@ -149,13 +149,68 @@ class Response(object):
         start_response(self.status, self.headers.items())
         return [self.content]
 
+class Route(object):
+
+    syntax = re.compile(r'<(?P<name>[a-zA-Z_][a-zA-Z_0-9]*):(?P<pattern>[^>]+)>')
+
+    def __init__(self, pattern, handler, method):
+        self.handler = handler
+        self.method = method
+        self.pattern = self._pattern(pattern)
+        parts = self._parse(pattern)
+        self.regex = self._regex(parts)
+        self.url = self._url(parts)
+        self.params = self._params(parts)
+
+    def _pattern(self, pattern):
+        if not pattern.endswith('/')
+            pattern += '/'
+        return pattern
+
+    def _regex(self, parts):
+        regex = ''
+        for part in self._parse(pattern):
+            if isinstance(part, basestring):
+                regex += part
+            elif isinstance(part, dict):
+                regex += '(?P<%s>%s)' % (part['name'], part['pattern'])
+            else:
+                raise TypeError
+        return re.compile('^%s$' % regex)
+
+    def _url(self, pattern):
+        url = ''
+        for part in self._parse(pattern):
+            if isinstance(part, basestring):
+                url += part
+            else:
+                url += '%s'
+        return url
+
+    def _params(self, pattern):
+        params = []
+        for part in self._parse(pattern):
+            if isinstance(part, dict):
+                params += [{'name': part['name'], 'regex': re.compile(part['pattern'])}]
+        return params
+
+    @memoized
+    def _parse(self, pattern):
+        start = end = 0
+        parts = []
+        for match in self.syntax.finditer(pattern):
+            start = match.start()
+            parts += [pattern[end:start], match.groupdict()]
+            end = match.end()
+        return parts + [pattern[end:]]
+
 class Application(object):
 
     def __init__(self, debug = False, routes = None):
         self.debug = debug
         self.routes = []
-        for url, handler, method in routes or []:
-            self.route(url, method)(handler)
+        for pattern, handler, method in routes or []:
+            self.route(pattern, method)(handler)
 
     def __call__(self, environ, start_response):
         request = Request(environ)
@@ -175,20 +230,18 @@ class Application(object):
         if not request.path.endswith('/'):
             request.path += '/'
         status = 404
-        for regex, handler, method in self.routes:
-            match = regex.match(request.path)
+        for route in self.routes:
+            match = route.regex.match(request.path)
             if match:
                 status = 405
-                if method == request.method:
-                    return (handler, match.groupdict())
+                if route.method == request.method:
+                    return (route.handler, match.groupdict())
         return (lambda request: status_response(status), {})
 
-    def route(self, url, method):
-        if not url.endswith('/'):
-            url += '/'
-        regex = re.compile('^%s$' % url)
+    def route(self, pattern, method):
         def register(handler):
-            self.routes.append((regex, handler, method))
+            route = Route(pattern, handler, method)
+            self.routes.append(route)
             return handler
         return register
 
