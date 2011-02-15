@@ -164,20 +164,13 @@ class Route(object):
     def __init__(self, pattern, handler, method):
         self.handler = handler
         self.method = method
-        self.pattern = self._pattern(pattern)
-        parts = self._parse(self.pattern)
-        self.regex = self._regex(parts)
-        self.url = self._url(parts)
-        self.params = self._params(parts)
+        self.pattern = pattern if pattern.endswith('/') else pattern + '/'
 
-    def _pattern(self, pattern):
-        if not pattern.endswith('/'):
-            pattern += '/'
-        return pattern
-
-    def _regex(self, parts):
+    @property
+    @memoized
+    def regex(self):
         regex = ''
-        for part in parts:
+        for part in self._parse():
             if isinstance(part, basestring):
                 regex += part
             elif isinstance(part, dict):
@@ -186,30 +179,35 @@ class Route(object):
                 raise TypeError
         return re.compile('^%s$' % regex)
 
-    def _url(self, parts):
+    @property
+    @memoized
+    def url(self):
         url = ''
-        for part in parts:
+        for part in self._parse():
             if isinstance(part, basestring):
                 url += part
             else:
                 url += '%s'
         return url
 
-    def _params(self, parts):
+    @property
+    @memoized
+    def params(self):
         params = []
-        for part in parts:
+        for part in self._parse():
             if isinstance(part, dict):
                 params += [{'name': part['name'], 'regex': re.compile(part['pattern'])}]
         return params
 
-    def _parse(self, pattern):
+    @memoized
+    def _parse(self):
         start = end = 0
         parts = []
-        for match in self.syntax.finditer(pattern):
+        for match in self.syntax.finditer(self.pattern):
             start = match.start()
-            parts += [pattern[end:start], match.groupdict()]
+            parts += [self.pattern[end:start], match.groupdict()]
             end = match.end()
-        return parts + [pattern[end:]]
+        return parts + [self.pattern[end:]]
 
 class Application(object):
 
