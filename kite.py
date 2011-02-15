@@ -244,12 +244,21 @@ class Application(object):
             return handler
         return register
 
-    def url(self, handler, *args):
+    def url(self, handler, *args, **kwargs):
         routes = filter(lambda route: handler == route.handler, self.routes)
         for route in routes:
+            if args and kwargs:
+                return AttributeError('cannot provide both positional and named arguments')
             if len(args) == len(route.params):
                 if all([param['regex'].match(str(arg)) for arg, param in zip(args, route.params)]):
                     return route.url % tuple(args)
+            elif kwargs:
+                try:
+                    args = [kwargs[param['name']] for param in route.params]
+                    if all([param['regex'].match(str(arg)) for arg, param in zip(args, route.params)]):
+                        return route.url % tuple(args)
+                except KeyError:
+                    pass
         raise AttributeError('no matching route')
 
     def get(self, url):
