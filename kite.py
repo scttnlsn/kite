@@ -1,4 +1,5 @@
 import cgi
+import functools
 import re
 import StringIO
 import traceback
@@ -50,14 +51,21 @@ class memoized(object):
     
     def __init__(self, func):
         self.func = func
-        self.called = False
-        self.value = None
+        self.cache = {}
         
-    def __call__(self, instance):
-        if not self.called:
-            self.value = self.func(instance)
-            self.called = True
-        return self.value
+    def __call__(self, *args, **kwargs):
+        key = (self.func, args, frozenset(kwargs.iteritems()))
+        try:
+            return self.cache[key]
+        except KeyError:
+            value = self.func(*args, **kwargs)
+            self.cache[key] = value
+            return value
+        except TypeError:
+            return self.func(*args, **kwargs)
+            
+    def __get__(self, obj, objtype = None):
+        return functools.partial(self.__call__, obj)
 
 class Request(object):
 
